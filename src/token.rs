@@ -76,14 +76,14 @@ pub trait XmlSource: Sized {
     }
 }
 
-fn try_parse_punct<'a>(input: &mut impl XmlSource, punct: &'a str) -> Result<Option<&'a str>> {
+pub fn try_parse_punct<'a>(input: &mut impl XmlSource, punct: &'a str) -> Result<Option<&'a str>> {
     Ok(input.accept(punct)?.map(|n| {
         input.shift(n);
         punct
     }))
 }
 
-fn try_parse_lit<'a>(
+pub fn try_parse_lit<'a>(
     input: &mut impl XmlSource,
     rule: impl FnMut(&char) -> bool,
 ) -> Result<Option<Cow<'a, str>>> {
@@ -101,25 +101,29 @@ macro_rules! define_punctuation {
         #[derive(PartialEq, Debug)]
         pub struct $name;
 
-        impl Token for $name {
+        impl $crate::token::Token for $name {
             fn display() -> &'static str {
                 concat!("`", $punct, "`")
             }
         }
 
-        impl Punctuation for $name {
+        impl $crate::token::Punctuation for $name {
             const PUNCT: &'static str = $punct;
         }
 
-        impl Parse for $name {
-            fn parse(input: &mut impl XmlSource) -> Result<Self> {
+        impl $crate::token::Parse for $name {
+            fn parse(input: &mut impl $crate::token::XmlSource) -> $crate::error::Result<Self> {
+                use  $crate::token::Token;
                 Self::try_parse(input)?.ok_or_else(
-                    || SyntaxError::UnexpectedToken($name::display()).into()
+                    || $crate::error::SyntaxError::UnexpectedToken($name::display()).into()
                 )
             }
 
-            fn try_parse(input: &mut impl XmlSource) -> Result<Option<Self>> {
-                try_parse_punct(input, $name::PUNCT).map(|r| r.map(|_| Self))
+            fn try_parse(
+                input: &mut impl $crate::token::XmlSource
+            ) -> $crate::error::Result<Option<Self>> {
+                use  $crate::token::Punctuation;
+                $crate::token::try_parse_punct(input, $name::PUNCT).map(|r| r.map(|_| Self))
             }
         }
     )+};
@@ -127,35 +131,33 @@ macro_rules! define_punctuation {
 
 macro_rules! define_delimiters {
     ($( $name:ident $start:literal .. $end:literal ),+ $(,)?) => {
-        pub mod end_delimiters {
+        pub mod end_delim {
             use super::*;
-
-            $(define_punctuation! {
-                $name $end,
-            })+
+            define_punctuation! { $( $name $end),+ }
         }
 
-        $(define_punctuation! {
-            $name $start,
-        }
-        impl Delimiter for $name {
-            type End = end_delimiters::$name;
-        })+
+        define_punctuation! { $( $name $start),+ }
+        $(
+            impl Delimiter for $name {
+                type End = end_delim::$name;
+            }
+        )+
     };
 }
 
+#[macro_export]
 macro_rules! define_literals {
     ($($name:ident by { $rule:expr } $( in $( $delim:ident )|+ )?),+ $(,)?) => {$(
         #[derive(PartialEq, Eq, Debug)]
-        pub struct $name<'a>(Cow<'a, str>);
+        pub struct $name<'a>(std::borrow::Cow<'a, str>);
 
-        impl Token for $name<'_> {
+        impl $crate::token::Token for $name<'_> {
             fn display() -> &'static str {
                 stringify!($name)
             }
         }
 
-        impl<'a> Literal for $name<'a> {
+        impl<'a> $crate::token::Literal for $name<'a> {
             fn rule() -> impl FnMut(&char) -> bool {
                 $rule
             }
@@ -164,14 +166,17 @@ macro_rules! define_literals {
             }
         }
 
-        impl Parse for $name<'_> {
-            fn parse(input: &mut impl XmlSource) -> Result<Self> {
+        impl $crate::token::Parse for $name<'_> {
+            fn parse(input: &mut impl $crate::token::XmlSource) -> $crate::error::Result<Self> {
+                use  $crate::token::Token;
                 Self::try_parse(input)?.ok_or_else(
-                    || SyntaxError::UnexpectedToken($name::display()).into()
+                    || $crate::error::SyntaxError::UnexpectedToken($name::display()).into()
                 )
             }
 
-            fn try_parse(input: &mut impl XmlSource) -> Result<Option<Self>> {
+            fn try_parse(
+                input: &mut impl $crate::token::XmlSource
+            ) -> $crate::error::Result<Option<Self>> {
                 $(
                     let input = &mut $(if try_parse_punct(input, $delim::PUNCT)?.is_some() {
                         input.take_until(<$delim as Delimiter>::End::PUNCT)
@@ -180,7 +185,7 @@ macro_rules! define_literals {
                     };
                 )?
 
-                try_parse_lit(input, $rule).map(|r| r.map(|lit| Self(lit)))
+                $crate::token::try_parse_lit(input, $rule).map(|r| r.map(|lit| Self(lit)))
             }
         }
     )+};
