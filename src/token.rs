@@ -173,8 +173,8 @@ macro_rules! define_literals {
 
             fn try_parse(input: &mut impl XmlSource) -> Result<Option<Self>> {
                 $(
-                    let input = &mut $(if let Some(delim) = try_parse_punct(input, $delim::PUNCT)? {
-                        input.take_until(delim)
+                    let input = &mut $(if try_parse_punct(input, $delim::PUNCT)?.is_some() {
+                        input.take_until(<$delim as Delimiter>::End::PUNCT)
                     } )else+ else {
                         return Ok(None);
                     };
