@@ -74,11 +74,11 @@ impl<R: BufRead> XmlSource for StreamReader<R> {
         Ok(self.fill_buf()?.starts_with(needle).then_some(needle.len()))
     }
 
-    fn read_until<'a>(&'a mut self, delim: &'a str) -> impl XmlSource + 'a {
-        ReadUntil::new(self, delim)
+    fn take_until<'a>(&'a mut self, delim: &'a str) -> impl XmlSource {
+        TakeUntil::new(self, delim)
     }
 
-    fn take_while<'a>(&mut self, mut predicate: impl FnMut(&char) -> bool) -> Result<Cow<'a, str>> {
+    fn read_while<'a>(&mut self, mut predicate: impl FnMut(&char) -> bool) -> Result<Cow<'a, str>> {
         if self.is_empty()? {
             return Ok(Cow::Borrowed(""));
         }
@@ -162,15 +162,15 @@ impl<'a> Deref for Delim<'a> {
     }
 }
 
-pub struct ReadUntil<'a, R> {
+pub struct TakeUntil<'a, R> {
     inner: &'a mut R,
     delim: Delim<'a>,
     is_ended: bool,
 }
 
-impl<'a, R: BufRead> ReadUntil<'a, StreamReader<R>> {
+impl<'a, R: BufRead> TakeUntil<'a, StreamReader<R>> {
     fn new(inner: &'a mut StreamReader<R>, delim: &'a str) -> Self {
-        ReadUntil {
+        TakeUntil {
             inner,
             delim: Delim::new(delim),
             is_ended: false,
@@ -178,7 +178,7 @@ impl<'a, R: BufRead> ReadUntil<'a, StreamReader<R>> {
     }
 }
 
-impl<R: BufRead> XmlSource for ReadUntil<'_, StreamReader<R>> {
+impl<R: BufRead> XmlSource for TakeUntil<'_, StreamReader<R>> {
     fn pos(&self) -> (usize, usize) {
         self.inner.pos()
     }
@@ -202,7 +202,6 @@ impl<R: BufRead> XmlSource for ReadUntil<'_, StreamReader<R>> {
                 is_empty = self.is_ended;
             }
         }
-
         Ok(is_empty)
     }
 
@@ -219,11 +218,11 @@ impl<R: BufRead> XmlSource for ReadUntil<'_, StreamReader<R>> {
             .then_some(needle.len()))
     }
 
-    fn read_until<'a>(&'a mut self, delim: &'a str) -> impl XmlSource + 'a {
-        self.inner.read_until(delim)
+    fn take_until<'a>(&'a mut self, delim: &'a str) -> impl XmlSource {
+        self.inner.take_until(delim)
     }
 
-    fn take_while<'a>(&mut self, mut predicate: impl FnMut(&char) -> bool) -> Result<Cow<'a, str>> {
+    fn read_while<'a>(&mut self, mut predicate: impl FnMut(&char) -> bool) -> Result<Cow<'a, str>> {
         if self.is_empty()? {
             return Ok(Cow::Borrowed(""));
         }
@@ -231,7 +230,7 @@ impl<R: BufRead> XmlSource for ReadUntil<'_, StreamReader<R>> {
         let mut taken_delim_bytes = 0;
         let mut matched_delim_bytes = 0;
 
-        let mut result = self.inner.take_while(|ch| {
+        let mut result = self.inner.read_while(|ch| {
             taken_delim_bytes = matched_delim_bytes;
 
             if self.delim.raw[matched_delim_bytes..].starts_with(*ch) {

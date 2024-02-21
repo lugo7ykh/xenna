@@ -20,7 +20,7 @@ pub trait Parse: Sized + Debug {
     }
 }
 
-pub trait Token: Parse + Debug {
+pub trait Token: Parse {
     fn display() -> &'static str;
 }
 
@@ -48,8 +48,8 @@ pub trait XmlSource: Sized {
     fn is_empty(&mut self) -> Result<bool>;
 
     fn accept(&mut self, needle: &str) -> Result<Option<usize>>;
-    fn read_until<'a>(&'a mut self, delim: &'a str) -> impl XmlSource + 'a;
-    fn take_while<'a>(&mut self, predicate: impl FnMut(&char) -> bool) -> Result<Cow<'a, str>>;
+    fn take_until<'a>(&'a mut self, delim: &'a str) -> impl XmlSource;
+    fn read_while<'a>(&mut self, predicate: impl FnMut(&char) -> bool) -> Result<Cow<'a, str>>;
 
     fn parse<T: Parse>(&mut self) -> Result<T> {
         T::parse(self)
@@ -70,7 +70,7 @@ pub trait XmlSource: Sized {
 
     fn delimited<D: Delimiter>(&mut self) -> Result<impl XmlSource> {
         D::parse(self)?;
-        let content = self.read_until(D::End::PUNCT);
+        let content = self.take_until(D::End::PUNCT);
 
         Ok(content)
     }
@@ -87,7 +87,7 @@ fn try_parse_lit<'a>(
     input: &mut impl XmlSource,
     rule: impl FnMut(&char) -> bool,
 ) -> Result<Option<Cow<'a, str>>> {
-    let token = input.take_while(rule)?;
+    let token = input.read_while(rule)?;
 
     if token.is_empty() {
         return Ok(None);
@@ -174,7 +174,7 @@ macro_rules! define_literals {
             fn try_parse(input: &mut impl XmlSource) -> Result<Option<Self>> {
                 $(
                     let input = &mut $(if let Some(delim) = try_parse_punct(input, $delim::PUNCT)? {
-                        input.read_until(delim)
+                        input.take_until(delim)
                     } )else+ else {
                         return Ok(None);
                     };

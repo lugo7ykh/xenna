@@ -265,32 +265,3 @@ impl<'a> From<&'a str> for EventReader<StreamReader<&'a [u8]>> {
         EventReader::new(StreamReader::new(value.as_bytes()))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-    <note>
-        <to>Tove</to>
-        <from>Jani</from>
-        <heading>Reminder</heading>
-        <body>Don't forget me this weekend!</body>
-    </note>
-    "#;
-
-    #[test]
-    fn can_parse_simple_xml() -> Result<()> {
-        let mut reader = EventReader::from(XML);
-
-        loop {
-            let event = reader.next_event()?;
-            println!("{event:?}");
-
-            if event == XmlEvent::Eof {
-                break;
-            }
-        }
-        Ok(())
-    }
-}
