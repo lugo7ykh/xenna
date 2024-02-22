@@ -4,14 +4,9 @@ const UTF_8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 const UTF_16BE_BOM: &[u8] = &[0xFE, 0xFF];
 const UTF_16LE_BOM: &[u8] = &[0xFF, 0xFE];
 
-pub trait Encode {
-    fn utf8() -> &'static [u8];
-}
-
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Encoding {
     Ascii,
-    // Latin1,
     #[default]
     Utf8,
     Utf16Be,
@@ -28,35 +23,12 @@ impl Encoding {
         }
     }
 
-    // pub fn encode<'a>(&self, str: &'a str) -> &'a [u8] {
-    //     match self {
-    //         Encoding::Utf8 => str.as_bytes(),
-    //         _ => todo!(),
-    //     }
-    // }
-
-    // pub fn decode(&self, bytes: Vec<u8>) -> String {
-    //     match self {
-    //         Self::Ascii | Self::Utf8 => unsafe { String::from_utf8_unchecked(bytes) },
-    //         _ => todo!(),
-    //     }
-    // }
-
     pub fn decode_char(&self, bytes: &[u8]) -> Option<char> {
-        if bytes.is_empty() {
-            return None;
-        }
-        let char_len = if self == &Encoding::Utf8 {
-            utf8_char_len(bytes[0]).unwrap()
-        } else {
-            self.bytes_per_char()
+        let char_len = match self {
+            Self::Utf8 => bytes.first().map(|&b| utf8_char_len(b))?.unwrap(),
+            _ => self.bytes_per_char(),
         };
-
-        if bytes.len() < char_len {
-            return None;
-        }
-
-        let code_point = &bytes[..char_len];
+        let code_point = bytes.get(..char_len)?;
 
         match self {
             Self::Ascii | Self::Utf8 => unsafe { std::str::from_utf8_unchecked(code_point) },

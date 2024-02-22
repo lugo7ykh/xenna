@@ -83,7 +83,6 @@ impl<R: BufRead> XmlSource for StreamReader<R> {
             return Ok(Cow::Borrowed(""));
         }
         let enc = self.encoding()?;
-        let mut pos = 0;
         let mut char_len = enc.bytes_per_char();
         let mut char_buf = Vec::with_capacity(encoding::MAX_BYTES_PER_CHAR);
         let mut result = String::new();
@@ -92,6 +91,7 @@ impl<R: BufRead> XmlSource for StreamReader<R> {
         loop {
             let buf = &self.fill_buf()?;
             let buf_len = buf.len();
+            let mut buf_pos = 0;
 
             if buf.is_empty() {
                 break;
@@ -121,7 +121,7 @@ impl<R: BufRead> XmlSource for StreamReader<R> {
                     .map_while(|res| {
                         res.map_err(|e| error = Some(e)).ok().and_then(|(ch, len)| {
                             predicate(&ch).then(|| {
-                                pos += len;
+                                buf_pos += len;
                                 ch
                             })
                         })
@@ -130,10 +130,10 @@ impl<R: BufRead> XmlSource for StreamReader<R> {
 
             if let Some(e) = error {
                 return Err(e);
-            } else if pos > 0 {
-                self.consume(pos);
+            } else if buf_pos > 0 {
+                self.consume(buf_pos);
             }
-            if char_buf.len() == char_len && pos < buf_len {
+            if buf_pos < buf_len {
                 break;
             }
         }
@@ -231,9 +231,8 @@ impl<R: BufRead> XmlSource for TakeUntil<'_, StreamReader<R>> {
         let mut matched_delim_bytes = 0;
 
         let mut result = self.inner.read_while(|ch| {
-            taken_delim_bytes = matched_delim_bytes;
-
             if self.delim.raw[matched_delim_bytes..].starts_with(*ch) {
+                taken_delim_bytes = matched_delim_bytes;
                 matched_delim_bytes += ch.len_utf8();
             } else {
                 matched_delim_bytes = 0;
