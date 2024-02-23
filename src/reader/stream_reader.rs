@@ -83,60 +83,33 @@ impl<R: BufRead> XmlSource for StreamReader<R> {
             return Ok(Cow::Borrowed(""));
         }
         let enc = self.encoding()?;
-        let mut char_len = enc.bytes_per_char();
-        let mut char_buf = Vec::with_capacity(encoding::MAX_BYTES_PER_CHAR);
+        let mut buf = self.fill_buf()?;
+        let mut buf_pos = 0;
         let mut result = String::new();
-        let mut error = None;
 
         loop {
-            let buf = &self.fill_buf()?;
-            let buf_len = buf.len();
-            let mut buf_pos = 0;
-
             if buf.is_empty() {
                 break;
             }
-            result.extend(
-                buf.iter()
-                    .by_ref()
-                    .filter_map(|&byte| {
-                        if char_buf.len() == char_len {
-                            char_buf.clear();
-                        }
 
-                        if char_buf.is_empty() && enc == Encoding::Utf8 {
-                            match encoding::utf8_char_len(byte) {
-                                Ok(l) => char_len = l,
-                                Err(e) => return Some(Err(e.into())),
-                            }
-                        }
-
-                        char_buf.push(byte);
-                        if char_buf.len() == char_len {
-                            enc.decode_char(&char_buf).map(|ch| Ok((ch, char_len)))
-                        } else {
-                            None
-                        }
-                    })
-                    .map_while(|res| {
-                        res.map_err(|e| error = Some(e)).ok().and_then(|(ch, len)| {
-                            predicate(&ch).then(|| {
-                                buf_pos += len;
-                                ch
-                            })
-                        })
-                    }),
-            );
-
-            if let Some(e) = error {
-                return Err(e);
-            } else if buf_pos > 0 {
-                self.consume(buf_pos);
-            }
-            if buf_pos < buf_len {
-                break;
+            match enc.decode_char(&buf[buf_pos..]) {
+                Some((ch, len)) if predicate(&ch) => {
+                    result.push(ch);
+                    buf_pos += len;
+                    continue;
+                }
+                None => {
+                    self.consume(buf_pos);
+                    buf = self.fill_buf()?;
+                    buf_pos = 0;
+                }
+                _ => break,
             }
         }
+        if buf_pos > 0 {
+            self.consume(buf_pos);
+        }
+
         Ok(Cow::Owned(result))
     }
 }

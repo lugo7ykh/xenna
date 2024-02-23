@@ -13,8 +13,6 @@ pub enum Encoding {
     Utf16Le,
 }
 
-pub(crate) const MAX_BYTES_PER_CHAR: usize = 4;
-
 impl Encoding {
     pub(crate) const fn bytes_per_char(&self) -> usize {
         match self {
@@ -23,7 +21,7 @@ impl Encoding {
         }
     }
 
-    pub fn decode_char(&self, bytes: &[u8]) -> Option<char> {
+    pub fn decode_char(&self, bytes: &[u8]) -> Option<(char, usize)> {
         let char_len = match self {
             Self::Utf8 => bytes.first().map(|&b| utf8_char_len(b))?.unwrap(),
             _ => self.bytes_per_char(),
@@ -36,6 +34,7 @@ impl Encoding {
         }
         .chars()
         .next()
+        .map(|char| (char, char_len))
     }
 }
 
