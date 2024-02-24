@@ -14,17 +14,11 @@ pub enum Encoding {
 }
 
 impl Encoding {
-    pub(crate) const fn bytes_per_char(&self) -> usize {
-        match self {
-            Encoding::Utf16Be | Encoding::Utf16Le => 2,
-            _ => 1,
-        }
-    }
-
     pub fn decode_char(&self, bytes: &[u8]) -> Option<(char, usize)> {
         let char_len = match self {
             Self::Utf8 => bytes.first().map(|&b| utf8_char_len(b))?.unwrap(),
-            _ => self.bytes_per_char(),
+            Encoding::Utf16Be | Encoding::Utf16Le => 2,
+            _ => 1,
         };
         let code_point = bytes.get(..char_len)?;
 

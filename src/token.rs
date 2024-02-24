@@ -33,7 +33,6 @@ pub trait Delimiter: Punctuation {
 }
 
 pub trait Literal: Token {
-    fn rule() -> impl FnMut(&char) -> bool;
     fn value(&self) -> &str;
 
     fn is(&self, value: &str) -> bool {
@@ -158,9 +157,6 @@ macro_rules! define_literals {
         }
 
         impl<'a> $crate::token::Literal for $name<'a> {
-            fn rule() -> impl FnMut(&char) -> bool {
-                $rule
-            }
             fn value(&self) -> &str {
                 self.0.as_ref()
             }
