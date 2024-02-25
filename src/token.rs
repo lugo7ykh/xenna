@@ -147,7 +147,7 @@ macro_rules! define_delimiters {
 #[macro_export]
 macro_rules! define_literals {
     ($($name:ident by { $rule:expr } $( in $( $delim:ident )|+ )?),+ $(,)?) => {$(
-        #[derive(PartialEq, Eq, Debug)]
+        #[derive(PartialEq, Eq, Clone, Debug)]
         pub struct $name<'a>(std::borrow::Cow<'a, str>);
 
         impl $crate::token::Token for $name<'_> {

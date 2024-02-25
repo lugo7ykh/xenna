@@ -3,7 +3,7 @@ pub mod stream_reader;
 use std::str;
 
 use crate::error::Result;
-use crate::token::{self, AttValue, Comment, Literal, Name, Parse, Text, XmlSource, S};
+use crate::token::{self, AttValue, Comment, Name, Parse, Text, XmlSource, S};
 use crate::Token;
 
 use self::stream_reader::StreamReader;
@@ -176,13 +176,13 @@ pub enum State {
     Eof,
 }
 
-pub struct EventReader<P> {
+pub struct EventReader<'a, P> {
     src: P,
     st: State,
-    path: Vec<Box<str>>,
+    path: Vec<Name<'a>>,
 }
 
-impl<S: XmlSource> EventReader<S> {
+impl<S: XmlSource> EventReader<'_, S> {
     pub fn new<I: Into<S>>(src: I) -> Self {
         EventReader {
             src: src.into(),
@@ -207,7 +207,7 @@ impl<S: XmlSource> EventReader<S> {
                     Ok(misc)
                 } else if let Some(s_tag) = self.src.try_parse::<StartTag>()? {
                     self.st = State::InElem;
-                    self.path.push(s_tag.name.value().into());
+                    self.path.push(s_tag.name.clone());
                     Ok(XmlEvent::STag(s_tag))
                 } else {
                     todo!("error")
@@ -226,10 +226,10 @@ impl<S: XmlSource> EventReader<S> {
                 self.st = State::InElem;
 
                 if let Some(s_tag) = self.src.try_parse::<StartTag>()? {
-                    self.path.push(s_tag.name.value().into());
+                    self.path.push(s_tag.name.clone());
                     Ok(XmlEvent::STag(s_tag))
                 } else if let Some(e_tag) = self.src.try_parse::<EndTag>()? {
-                    if self.path.pop().is_some_and(|t| e_tag.name.is(&t)) {
+                    if self.path.pop().is_some_and(|t| t == e_tag.name) {
                         if self.path.is_empty() {
                             self.st = State::AfterRoot;
                         }
@@ -260,7 +260,7 @@ impl<S: XmlSource> EventReader<S> {
     }
 }
 
-impl<'a> From<&'a str> for EventReader<StreamReader<&'a [u8]>> {
+impl<'a> From<&'a str> for EventReader<'a, StreamReader<&'a [u8]>> {
     fn from(value: &'a str) -> Self {
         EventReader::new(StreamReader::new(value.as_bytes()))
     }
