@@ -1,10 +1,13 @@
-use std::io::{Error, ErrorKind, Result};
+use std::{
+    io::{Error, ErrorKind, Result},
+    str,
+};
 
 const UTF_8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 const UTF_16BE_BOM: &[u8] = &[0xFE, 0xFF];
 const UTF_16LE_BOM: &[u8] = &[0xFF, 0xFE];
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Default, PartialEq, Clone, Copy, Debug)]
 pub enum Encoding {
     Ascii,
     #[default]
@@ -16,14 +19,14 @@ pub enum Encoding {
 impl Encoding {
     pub fn decode_char(&self, bytes: &[u8]) -> Option<(char, usize)> {
         let char_len = match self {
-            Self::Utf8 => bytes.first().map(|&b| utf8_char_len(b))?.unwrap(),
+            Self::Utf8 => utf8_char_len(*bytes.first()?).unwrap(),
             Encoding::Utf16Be | Encoding::Utf16Le => 2,
             _ => 1,
         };
-        let code_point = bytes.get(..char_len)?;
+        let char_bytes = bytes.get(..char_len)?;
 
         match self {
-            Self::Ascii | Self::Utf8 => unsafe { std::str::from_utf8_unchecked(code_point) },
+            Self::Ascii | Self::Utf8 => unsafe { str::from_utf8_unchecked(char_bytes) },
             _ => todo!(),
         }
         .chars()

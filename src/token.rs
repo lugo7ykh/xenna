@@ -97,7 +97,7 @@ pub fn try_parse_lit<'a>(
 #[macro_export]
 macro_rules! define_punctuation {
     ($( $name:ident $punct:literal ),+ $(,)?) => {$(
-        #[derive(PartialEq, Debug)]
+        #[derive(Debug)]
         pub struct $name;
 
         impl $crate::token::Token for $name {
@@ -147,8 +147,14 @@ macro_rules! define_delimiters {
 #[macro_export]
 macro_rules! define_literals {
     ($($name:ident by { $rule:expr } $( in $( $delim:ident )|+ )?),+ $(,)?) => {$(
-        #[derive(PartialEq, Eq, Clone, Debug)]
+        #[derive(PartialEq, Clone, Debug)]
         pub struct $name<'a>(std::borrow::Cow<'a, str>);
+
+        impl<'a> $name<'a> {
+            pub fn new<T: Into<Cow<'a, str>>>(value: T) -> Self {
+                Self(value.into())
+            }
+        }
 
         impl $crate::token::Token for $name<'_> {
             fn display() -> &'static str {

@@ -29,8 +29,8 @@ impl<R: BufRead> StreamReader<R> {
 
     fn consume(&mut self, amt: usize) {
         if amt > 0 {
-            self.pos += amt + self.shift;
-            self.reader.consume(amt + self.shift);
+            self.pos += self.shift + amt;
+            self.reader.consume(self.shift + amt);
             self.shift = 0;
         }
     }
@@ -111,7 +111,7 @@ impl<R: BufRead> XmlSource for StreamReader<R> {
 
 pub struct TakeUntil<'a, R> {
     inner: &'a mut R,
-    delim: &'a str,
+    delim: Cow<'a, [u8]>,
     is_ended: bool,
 }
 
@@ -119,7 +119,7 @@ impl<'a, R: BufRead> TakeUntil<'a, StreamReader<R>> {
     fn new(inner: &'a mut StreamReader<R>, delim: &'a str) -> Self {
         TakeUntil {
             inner,
-            delim,
+            delim: delim.as_bytes().into(),
             is_ended: false,
         }
     }
@@ -141,7 +141,7 @@ impl<R: BufRead> XmlSource for TakeUntil<'_, StreamReader<R>> {
     fn is_empty(&mut self) -> Result<bool> {
         if self.is_ended || self.inner.is_empty()? {
             Ok(true)
-        } else if self.inner.fill_buf()?.starts_with(self.delim.as_bytes()) {
+        } else if self.inner.fill_buf()?.starts_with(&self.delim) {
             self.inner.consume(self.delim.len());
             self.is_ended = true;
             Ok(true)
@@ -168,7 +168,7 @@ impl<R: BufRead> XmlSource for TakeUntil<'_, StreamReader<R>> {
         let mut result = String::new();
 
         loop {
-            if buf.starts_with(self.delim.as_bytes()) {
+            if buf.starts_with(&self.delim) {
                 self.inner.consume(self.delim.len());
                 self.is_ended = true;
                 break;
