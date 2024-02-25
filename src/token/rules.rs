@@ -1,4 +1,4 @@
-pub fn accept_as_char(ch: &char) -> bool {
+pub(super) fn accept_as_char(ch: &char) -> bool {
     matches!(ch,
         | '\u{9}'
         | '\u{A}'
@@ -9,7 +9,7 @@ pub fn accept_as_char(ch: &char) -> bool {
     )
 }
 
-pub(crate) fn accept_as_white_space(ch: &char) -> bool {
+pub(super) fn accept_as_white_space(ch: &char) -> bool {
     matches!(ch, '\u{20}' | '\u{9}' | '\u{D}' | '\u{A}')
 }
 
@@ -46,11 +46,11 @@ fn accept_as_name_char(ch: &char) -> bool {
         )
 }
 
-pub(crate) fn accept_as_att_value(ch: &char) -> bool {
+pub(super) fn accept_as_att_value(ch: &char) -> bool {
     !matches!(ch, '<' | '&')
 }
 
-pub(crate) fn accept_as_name() -> impl FnMut(&char) -> bool {
+pub(super) fn accept_as_name() -> impl FnMut(&char) -> bool {
     let mut is_start_char = true;
 
     move |ch| {
@@ -63,7 +63,7 @@ pub(crate) fn accept_as_name() -> impl FnMut(&char) -> bool {
     }
 }
 
-pub fn accept_as_comment() -> impl FnMut(&char) -> bool {
+pub(super) fn accept_as_comment() -> impl FnMut(&char) -> bool {
     let mut previous_was_a_hyphen = false;
 
     move |ch| {
@@ -82,7 +82,7 @@ pub fn accept_as_comment() -> impl FnMut(&char) -> bool {
 
 const CDATA_CLOSE_DELIM: &str = "]]>";
 
-pub(crate) fn accept_as_char_data() -> impl FnMut(&char) -> bool {
+pub(super) fn accept_as_char_data() -> impl FnMut(&char) -> bool {
     let delim_len = CDATA_CLOSE_DELIM.len();
     let mut matched_bytes_count = 0;
 
