@@ -1,16 +1,16 @@
 mod rules;
 
-use std::{borrow::Cow, fmt::Debug};
+use std::borrow::Cow;
 
 use crate::error::{Error, Result, SyntaxError};
 
-pub trait Parse: Sized + Debug {
+pub trait Parse: Sized {
     fn parse(input: &mut impl XmlSource) -> Result<Self>;
 
     fn try_parse(input: &mut impl XmlSource) -> Result<Option<Self>> {
         let (pos_before_try, shift_before_try) = input.pos();
 
-        Self::parse(input).map(|r| Some(r)).or_else(|e| match e {
+        Self::parse(input).map(Some).or_else(|e| match e {
             Error::Syntax(SyntaxError::UnexpectedToken(_)) if input.pos().0 == pos_before_try => {
                 input.unshift(input.pos().1 - shift_before_try);
                 Ok(None)
@@ -131,7 +131,6 @@ macro_rules! define_punctuation {
 macro_rules! define_delimiters {
     ($( $name:ident $start:literal .. $end:literal ),+ $(,)?) => {
         pub mod end_delim {
-            use super::*;
             define_punctuation! { $( $name $end),+ }
         }
 
