@@ -73,7 +73,7 @@ impl<R: BufRead> XmlSource for StreamReader<R> {
         TakeUntil::new(self, delim)
     }
 
-    fn read_while<'a>(&mut self, mut predicate: impl FnMut(&char) -> bool) -> Result<Cow<'a, str>> {
+    fn read_while<'a>(&mut self, mut predicate: impl FnMut(char) -> bool) -> Result<Cow<'a, str>> {
         if self.is_empty()? {
             return Ok(Cow::Borrowed(""));
         }
@@ -84,7 +84,7 @@ impl<R: BufRead> XmlSource for StreamReader<R> {
 
         loop {
             match enc.decode_char(buf) {
-                Some((ch, len)) if predicate(&ch) => {
+                Some((ch, len)) if predicate(ch) => {
                     result.push(ch);
                     buf = &buf[len..];
                     buf_pos += len;
@@ -158,7 +158,7 @@ impl<R: BufRead> XmlSource for TakeUntil<'_, StreamReader<R>> {
         self.inner.take_until(delim)
     }
 
-    fn read_while<'a>(&mut self, mut predicate: impl FnMut(&char) -> bool) -> Result<Cow<'a, str>> {
+    fn read_while<'a>(&mut self, mut predicate: impl FnMut(char) -> bool) -> Result<Cow<'a, str>> {
         if self.is_empty()? {
             return Ok(Cow::Borrowed(""));
         }
@@ -174,7 +174,7 @@ impl<R: BufRead> XmlSource for TakeUntil<'_, StreamReader<R>> {
                 break;
             }
             match enc.decode_char(buf) {
-                Some((ch, len)) if predicate(&ch) => {
+                Some((ch, len)) if predicate(ch) => {
                     result.push(ch);
                     buf = &buf[len..];
                     buf_pos += len;

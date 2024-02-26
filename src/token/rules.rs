@@ -1,4 +1,4 @@
-pub(super) fn accept_as_char(ch: &char) -> bool {
+pub(super) fn accept_as_char(ch: char) -> bool {
     matches!(ch,
         | '\u{9}'
         | '\u{A}'
@@ -9,11 +9,11 @@ pub(super) fn accept_as_char(ch: &char) -> bool {
     )
 }
 
-pub(super) fn accept_as_white_space(ch: &char) -> bool {
+pub(super) fn accept_as_white_space(ch: char) -> bool {
     matches!(ch, '\u{20}' | '\u{9}' | '\u{D}' | '\u{A}')
 }
 
-fn accept_as_name_start_char(ch: &char) -> bool {
+fn accept_as_name_start_char(ch: char) -> bool {
     matches!(ch,
         | ':'
         | 'A'..='Z'
@@ -34,7 +34,7 @@ fn accept_as_name_start_char(ch: &char) -> bool {
     )
 }
 
-fn accept_as_name_char(ch: &char) -> bool {
+fn accept_as_name_char(ch: char) -> bool {
     accept_as_name_start_char(ch)
         || matches!(ch,
             | '-'
@@ -46,11 +46,11 @@ fn accept_as_name_char(ch: &char) -> bool {
         )
 }
 
-pub(super) fn accept_as_att_value(ch: &char) -> bool {
+pub(super) fn accept_as_att_value(ch: char) -> bool {
     !matches!(ch, '<' | '&')
 }
 
-pub(super) fn accept_as_name() -> impl FnMut(&char) -> bool {
+pub(super) fn accept_as_name() -> impl FnMut(char) -> bool {
     let mut is_start_char = true;
 
     move |ch| {
@@ -63,11 +63,11 @@ pub(super) fn accept_as_name() -> impl FnMut(&char) -> bool {
     }
 }
 
-pub(super) fn accept_as_comment() -> impl FnMut(&char) -> bool {
+pub(super) fn accept_as_comment() -> impl FnMut(char) -> bool {
     let mut previous_was_a_hyphen = false;
 
     move |ch| {
-        let current_is_a_hyphen = ch == &'-';
+        let current_is_a_hyphen = ch == '-';
 
         let is_accepted = if current_is_a_hyphen {
             !previous_was_a_hyphen
@@ -82,12 +82,12 @@ pub(super) fn accept_as_comment() -> impl FnMut(&char) -> bool {
 
 const CDATA_CLOSE_DELIM: &str = "]]>";
 
-pub(super) fn accept_as_char_data() -> impl FnMut(&char) -> bool {
+pub(super) fn accept_as_char_data() -> impl FnMut(char) -> bool {
     let delim_len = CDATA_CLOSE_DELIM.len();
     let mut matched_bytes_count = 0;
 
     move |ch| {
-        if CDATA_CLOSE_DELIM[matched_bytes_count..].starts_with(*ch) {
+        if CDATA_CLOSE_DELIM[matched_bytes_count..].starts_with(ch) {
             matched_bytes_count += ch.len_utf8();
         } else {
             matched_bytes_count = 0;

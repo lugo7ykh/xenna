@@ -48,7 +48,7 @@ pub trait XmlSource: Sized {
 
     fn accept(&mut self, needle: &str) -> Result<Option<usize>>;
     fn take_until<'a>(&'a mut self, delim: &'a str) -> impl XmlSource;
-    fn read_while<'a>(&mut self, predicate: impl FnMut(&char) -> bool) -> Result<Cow<'a, str>>;
+    fn read_while<'a>(&mut self, predicate: impl FnMut(char) -> bool) -> Result<Cow<'a, str>>;
 
     fn parse<T: Parse>(&mut self) -> Result<T> {
         T::parse(self)
@@ -84,7 +84,7 @@ pub fn try_parse_punct<'a>(input: &mut impl XmlSource, punct: &'a str) -> Result
 
 pub fn try_parse_lit<'a>(
     input: &mut impl XmlSource,
-    rule: impl FnMut(&char) -> bool,
+    rule: impl FnMut(char) -> bool,
 ) -> Result<Option<Cow<'a, str>>> {
     let token = input.read_while(rule)?;
 
