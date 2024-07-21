@@ -26,9 +26,9 @@ pub trait Literal: Token {
 }
 
 pub(super) trait ParseToken {
-    fn try_parse_punct<'p>(&mut self, punct: &'p str) -> Result<Option<&'p str>>;
+    fn opt_parse_punct<'p>(&mut self, punct: &'p str) -> Result<Option<&'p str>>;
 
-    fn try_parse_lit<'l>(
+    fn opt_parse_lit<'l>(
         &mut self,
         rule: impl FnMut(char) -> bool,
         delim: Option<&str>,
@@ -36,17 +36,17 @@ pub(super) trait ParseToken {
 }
 
 #[allow(private_bounds)]
-pub fn try_parse_punct<'p>(input: &mut impl ParseToken, punct: &'p str) -> Result<Option<&'p str>> {
-    input.try_parse_punct(punct)
+pub fn opt_parse_punct<'p>(input: &mut impl ParseToken, punct: &'p str) -> Result<Option<&'p str>> {
+    input.opt_parse_punct(punct)
 }
 
 #[allow(private_bounds)]
-pub fn try_parse_lit<'l>(
+pub fn opt_parse_lit<'l>(
     input: &mut impl ParseToken,
     rule: impl FnMut(char) -> bool,
     delim: Option<&str>,
 ) -> Result<Option<Cow<'l, str>>> {
-    input.try_parse_lit(rule, delim)
+    input.opt_parse_lit(rule, delim)
 }
 
 #[macro_export]
@@ -70,7 +70,7 @@ macro_rules! define_punctuation {
                 use  $crate::token::Token;
                 use  $crate::token::Punctuation;
 
-                $crate::token::try_parse_punct(input, $name::PUNCT).map(|r| r.map(|_| Self))?.ok_or_else(
+                $crate::token::opt_parse_punct(input, $name::PUNCT).map(|r| r.map(|_| Self))?.ok_or_else(
                     || $crate::error::SyntaxError::UnexpectedToken($name::display()).into()
                 )
             }
@@ -121,14 +121,14 @@ macro_rules! define_literals {
             fn parse(input: &mut impl $crate::parse::ParseSource) -> $crate::error::Result<Self> {
                 use  $crate::token::Token;
 
-                let delim = None $( .or($(if input.try_parse_punct($delim::PUNCT)?.is_some() {
+                let delim = None $( .or($(if input.opt_parse_punct($delim::PUNCT)?.is_some() {
                         Some(<$delim as Delimiter>::End::PUNCT)
                     } )else+ else {
                         return Err($crate::error::SyntaxError::UnexpectedToken($name::display()).into())
                     })
                 )?;
 
-                $crate::token::try_parse_lit(input, $rule, delim).map(|r| r.map(|lit| Self(lit)))?.ok_or_else(
+                $crate::token::opt_parse_lit(input, $rule, delim).map(|r| r.map(|lit| Self(lit)))?.ok_or_else(
                     || $crate::error::SyntaxError::UnexpectedToken($name::display()).into()
                 )
             }

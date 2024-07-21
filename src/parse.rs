@@ -19,7 +19,7 @@ pub trait ParseSource: ParseToken + Sized {
         T::parse(self)
     }
 
-    fn try_parse<P: Parse>(&mut self) -> Result<Option<P>>;
+    fn opt_parse<P: Parse>(&mut self) -> Result<Option<P>>;
 
     fn delimited<D: Delimiter>(&mut self) -> Result<impl ParseSource> {
         D::parse(self)?;
@@ -30,14 +30,14 @@ pub trait ParseSource: ParseToken + Sized {
 pub type Parser<T> = SrcReader<T>;
 
 impl<T: ReadSource> ParseToken for T {
-    fn try_parse_punct<'p>(&mut self, punct: &'p str) -> Result<Option<&'p str>> {
+    fn opt_parse_punct<'p>(&mut self, punct: &'p str) -> Result<Option<&'p str>> {
         Ok(self.accept(punct)?.map(|n| {
             self.shift(n);
             punct
         }))
     }
 
-    fn try_parse_lit<'a>(
+    fn opt_parse_lit<'a>(
         &mut self,
         rule: impl FnMut(char) -> bool,
         delim: Option<&str>,
@@ -56,7 +56,7 @@ impl<T: ReadSource> ParseSource for T {
         ReadSource::is_empty(self)
     }
 
-    fn try_parse<P: Parse>(&mut self) -> Result<Option<P>> {
+    fn opt_parse<P: Parse>(&mut self) -> Result<Option<P>> {
         let (pos_before, offset_before) = self.pos();
 
         let result = P::parse(self);
@@ -89,32 +89,32 @@ impl<'a, T> Delimited<'a, T> {
 }
 
 impl<'a, T: ParseToken> ParseToken for Delimited<'a, T> {
-    fn try_parse_punct<'p>(&mut self, punct: &'p str) -> Result<Option<&'p str>> {
-        self.inner.try_parse_punct(punct)
+    fn opt_parse_punct<'p>(&mut self, punct: &'p str) -> Result<Option<&'p str>> {
+        self.inner.opt_parse_punct(punct)
     }
 
-    fn try_parse_lit<'l>(
+    fn opt_parse_lit<'l>(
         &mut self,
         rule: impl FnMut(char) -> bool,
         delim: Option<&str>,
     ) -> Result<Option<Cow<'l, str>>> {
-        self.inner.try_parse_lit(rule, delim)
+        self.inner.opt_parse_lit(rule, delim)
     }
 }
 
 impl<'a, T: ParseSource> ParseSource for Delimited<'a, T> {
     fn is_empty(&mut self) -> Result<bool> {
         self.is_ended |= self.inner.is_empty()?;
-        self.is_ended |= self.inner.try_parse_punct(&self.delim)?.is_some();
+        self.is_ended |= self.inner.opt_parse_punct(&self.delim)?.is_some();
 
         Ok(self.is_ended)
     }
 
-    fn try_parse<P: Parse>(&mut self) -> Result<Option<P>> {
+    fn opt_parse<P: Parse>(&mut self) -> Result<Option<P>> {
         if self.is_empty()? {
             return Ok(None);
         }
-        self.inner.try_parse::<P>()
+        self.inner.opt_parse::<P>()
     }
 
     fn delimited<D: Delimiter>(&mut self) -> Result<impl ParseSource> {

@@ -11,9 +11,9 @@ struct Eq;
 
 impl Parse for Eq {
     fn parse(input: &mut impl ParseSource) -> Result<Self> {
-        input.try_parse::<S>()?;
+        input.opt_parse::<S>()?;
         input.parse::<Token![=]>()?;
-        input.try_parse::<S>()?;
+        input.opt_parse::<S>()?;
 
         Ok(Self)
     }
@@ -56,21 +56,21 @@ impl<'a> Parse for XmlDecl<'a> {
             content.parse::<Eq>()?;
             content.parse::<AttValue>()?
         };
-        content.try_parse::<S>()?;
+        content.opt_parse::<S>()?;
 
-        let encoding = if content.try_parse::<xml_decl_token::Enc>()?.is_some() {
+        let encoding = if content.opt_parse::<xml_decl_token::Enc>()?.is_some() {
             content.parse::<Eq>()?;
             let value = content.parse::<AttValue>()?;
-            content.try_parse::<S>()?;
+            content.opt_parse::<S>()?;
             Some(value)
         } else {
             None
         };
 
-        let standalone = if content.try_parse::<xml_decl_token::StAl>()?.is_some() {
+        let standalone = if content.opt_parse::<xml_decl_token::StAl>()?.is_some() {
             content.parse::<Eq>()?;
             let value = content.parse::<AttValue>()?;
-            content.try_parse::<S>()?;
+            content.opt_parse::<S>()?;
             Some(value)
         } else {
             None
@@ -99,11 +99,11 @@ impl Parse for Pi<'_> {
 }
 
 fn try_parse_misc<'a>(input: &mut impl ParseSource) -> Result<Option<XmlEvent<'a>>> {
-    if let Some(s) = input.try_parse::<S>()? {
+    if let Some(s) = input.opt_parse::<S>()? {
         Ok(Some(XmlEvent::S(s)))
-    } else if let Some(pi) = input.try_parse::<Pi>()? {
+    } else if let Some(pi) = input.opt_parse::<Pi>()? {
         Ok(Some(XmlEvent::Pi(pi)))
-    } else if let Some(comm) = input.try_parse::<Comment>()? {
+    } else if let Some(comm) = input.opt_parse::<Comment>()? {
         Ok(Some(XmlEvent::Comment(comm)))
     } else {
         Ok(None)
@@ -125,7 +125,7 @@ impl<'a> Parse for StartTag<'a> {
         while !content.is_empty()? {
             content.parse::<S>()?;
 
-            if let Some(att) = content.try_parse::<Attribute>()? {
+            if let Some(att) = content.opt_parse::<Attribute>()? {
                 attrs.push(att);
             }
         }
@@ -205,7 +205,7 @@ impl<'a, T: ParseSource> EventReader<'a, T> {
             State::Start => {
                 self.st = State::AfterXml;
 
-                if let Some(xml_decl) = self.src.try_parse::<XmlDecl>()? {
+                if let Some(xml_decl) = self.src.opt_parse::<XmlDecl>()? {
                     Ok(XmlEvent::Xml(xml_decl))
                 } else {
                     self.next_event()
@@ -214,7 +214,7 @@ impl<'a, T: ParseSource> EventReader<'a, T> {
             State::AfterXml => {
                 if let Some(misc) = try_parse_misc(&mut self.src)? {
                     Ok(misc)
-                } else if let Some(s_tag) = self.src.try_parse::<StartTag>()? {
+                } else if let Some(s_tag) = self.src.opt_parse::<StartTag>()? {
                     self.st = State::InElem;
                     self.path.push(s_tag.name.clone());
                     Ok(XmlEvent::STag(s_tag))
@@ -225,7 +225,7 @@ impl<'a, T: ParseSource> EventReader<'a, T> {
             State::InElem => {
                 self.st = State::AfterText;
 
-                if let Some(text) = self.src.try_parse::<Text>()? {
+                if let Some(text) = self.src.opt_parse::<Text>()? {
                     Ok(XmlEvent::Text(text))
                 } else {
                     self.next_event()
@@ -234,10 +234,10 @@ impl<'a, T: ParseSource> EventReader<'a, T> {
             State::AfterText => {
                 self.st = State::InElem;
 
-                if let Some(s_tag) = self.src.try_parse::<StartTag>()? {
+                if let Some(s_tag) = self.src.opt_parse::<StartTag>()? {
                     self.path.push(s_tag.name.clone());
                     Ok(XmlEvent::STag(s_tag))
-                } else if let Some(e_tag) = self.src.try_parse::<EndTag>()? {
+                } else if let Some(e_tag) = self.src.opt_parse::<EndTag>()? {
                     if self.path.pop().is_some_and(|t| t == e_tag.name) {
                         if self.path.is_empty() {
                             self.st = State::AfterRoot;
@@ -246,9 +246,9 @@ impl<'a, T: ParseSource> EventReader<'a, T> {
                     } else {
                         todo!("error")
                     }
-                } else if let Some(pi) = self.src.try_parse::<Pi>()? {
+                } else if let Some(pi) = self.src.opt_parse::<Pi>()? {
                     Ok(XmlEvent::Pi(pi))
-                } else if let Some(comment) = self.src.try_parse::<Comment>()? {
+                } else if let Some(comment) = self.src.opt_parse::<Comment>()? {
                     Ok(XmlEvent::Comment(comment))
                 } else {
                     todo!("error")
