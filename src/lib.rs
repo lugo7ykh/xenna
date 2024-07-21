@@ -1,4 +1,8 @@
 mod encoding;
+mod read;
+
 pub mod error;
+pub mod parse;
 pub mod reader;
-pub mod token;
+
+pub use parse::token;

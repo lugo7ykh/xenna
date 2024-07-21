@@ -12,8 +12,8 @@ const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 "#;
 
 #[test]
-fn can_parse_simple_xml() -> Result<(), Box<dyn Error>> {
-    let mut reader = EventReader::from(XML);
+fn parse_simple_xml() -> Result<(), Box<dyn Error>> {
+    let mut reader = EventReader::from(XML.as_bytes());
 
     loop {
         let event = reader.next_event()?;

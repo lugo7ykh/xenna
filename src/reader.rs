@@ -1,18 +1,16 @@
-pub mod stream_reader;
-
 use std::str;
 
 use crate::error::Result;
-use crate::token::{self, AttValue, Comment, Name, Parse, Text, XmlSource, S};
+use crate::parse::Parser;
+use crate::parse::{Parse, ParseSource};
+use crate::token::{self, AttValue, Comment, Name, Text, S};
 use crate::Token;
-
-use self::stream_reader::StreamReader;
 
 #[derive(PartialEq, Debug)]
 struct Eq;
 
 impl Parse for Eq {
-    fn parse(input: &mut impl XmlSource) -> Result<Self> {
+    fn parse(input: &mut impl ParseSource) -> Result<Self> {
         input.try_parse::<S>()?;
         input.parse::<Token![=]>()?;
         input.try_parse::<S>()?;
@@ -25,7 +23,7 @@ impl Parse for Eq {
 pub struct Attribute<'a>(Name<'a>, AttValue<'a>);
 
 impl<'a> Parse for Attribute<'a> {
-    fn parse(input: &mut impl XmlSource) -> Result<Self> {
+    fn parse(input: &mut impl ParseSource) -> Result<Self> {
         let name = input.parse::<Name>()?;
         input.parse::<Eq>()?;
 
@@ -40,19 +38,27 @@ pub struct XmlDecl<'a> {
     pub standalone: Option<AttValue<'a>>,
 }
 
+mod xml_decl_token {
+    crate::define_punctuation! {
+        Ver "version",
+        Enc "encoding",
+        StAl "standalone",
+    }
+}
+
 impl<'a> Parse for XmlDecl<'a> {
-    fn parse(input: &mut impl XmlSource) -> Result<Self> {
+    fn parse(input: &mut impl ParseSource) -> Result<Self> {
         let mut content = input.delimited::<token::XmlDecl>()?;
         content.parse::<S>()?;
 
         let version = {
-            content.parse_punct("version")?;
+            content.parse::<xml_decl_token::Ver>()?;
             content.parse::<Eq>()?;
             content.parse::<AttValue>()?
         };
         content.try_parse::<S>()?;
 
-        let encoding = if content.try_parse_punct("encoding")?.is_some() {
+        let encoding = if content.try_parse::<xml_decl_token::Enc>()?.is_some() {
             content.parse::<Eq>()?;
             let value = content.parse::<AttValue>()?;
             content.try_parse::<S>()?;
@@ -61,7 +67,7 @@ impl<'a> Parse for XmlDecl<'a> {
             None
         };
 
-        let standalone = if content.try_parse_punct("standalone")?.is_some() {
+        let standalone = if content.try_parse::<xml_decl_token::StAl>()?.is_some() {
             content.parse::<Eq>()?;
             let value = content.parse::<AttValue>()?;
             content.try_parse::<S>()?;
@@ -84,7 +90,7 @@ pub struct Pi<'a> {
 }
 
 impl Parse for Pi<'_> {
-    fn parse(input: &mut impl XmlSource) -> Result<Self> {
+    fn parse(input: &mut impl ParseSource) -> Result<Self> {
         let mut content = input.delimited::<token::Pi>()?;
         let target = content.parse::<Name>()?;
 
@@ -92,7 +98,7 @@ impl Parse for Pi<'_> {
     }
 }
 
-fn try_parse_misc<'a>(input: &mut impl XmlSource) -> Result<Option<XmlEvent<'a>>> {
+fn try_parse_misc<'a>(input: &mut impl ParseSource) -> Result<Option<XmlEvent<'a>>> {
     if let Some(s) = input.try_parse::<S>()? {
         Ok(Some(XmlEvent::S(s)))
     } else if let Some(pi) = input.try_parse::<Pi>()? {
@@ -111,7 +117,7 @@ pub struct StartTag<'a> {
 }
 
 impl<'a> Parse for StartTag<'a> {
-    fn parse(input: &mut impl XmlSource) -> Result<Self> {
+    fn parse(input: &mut impl ParseSource) -> Result<Self> {
         let mut content = input.delimited::<token::STag>()?;
         let name = content.parse::<Name>()?;
         let mut attrs = Vec::new();
@@ -134,9 +140,10 @@ pub struct EndTag<'a> {
 }
 
 impl<'a> Parse for EndTag<'a> {
-    fn parse(input: &mut impl XmlSource) -> Result<Self> {
+    fn parse(input: &mut impl ParseSource) -> Result<Self> {
         let mut content = input.delimited::<token::ETag>()?;
         let name = content.parse::<Name>()?;
+        content.is_empty()?;
 
         Ok(Self { name })
     }
@@ -148,7 +155,7 @@ pub struct EmptyElem<'a> {
 }
 
 impl<'a> Parse for EmptyElem<'a> {
-    fn parse(_input: &mut impl XmlSource) -> Result<Self> {
+    fn parse(_input: &mut impl ParseSource) -> Result<Self> {
         todo!()
     }
 }
@@ -176,21 +183,23 @@ pub enum State {
     Eof,
 }
 
-pub struct EventReader<'a, P> {
-    src: P,
+pub struct EventReader<'a, T> {
+    src: T,
     st: State,
     path: Vec<Name<'a>>,
 }
 
-impl<S: XmlSource> EventReader<'_, S> {
-    pub fn new<I: Into<S>>(src: I) -> Self {
+impl<'a, T> EventReader<'a, T> {
+    pub fn new(src: T) -> Self {
         EventReader {
-            src: src.into(),
+            src,
             st: State::Start,
             path: Vec::new(),
         }
     }
+}
 
+impl<'a, T: ParseSource> EventReader<'a, T> {
     pub fn next_event(&mut self) -> Result<XmlEvent> {
         match self.st {
             State::Start => {
@@ -246,11 +255,11 @@ impl<S: XmlSource> EventReader<'_, S> {
                 }
             }
             State::AfterRoot => {
-                if let Some(misc) = try_parse_misc(&mut self.src)? {
-                    Ok(misc)
-                } else if self.src.is_empty()? {
+                if self.src.is_empty()? {
                     self.st = State::Eof;
                     Ok(XmlEvent::Eof)
+                } else if let Some(misc) = try_parse_misc(&mut self.src)? {
+                    Ok(misc)
                 } else {
                     todo!("error")
                 }
@@ -260,8 +269,8 @@ impl<S: XmlSource> EventReader<'_, S> {
     }
 }
 
-impl<'a> From<&'a str> for EventReader<'a, StreamReader<&'a [u8]>> {
-    fn from(value: &'a str) -> Self {
-        EventReader::new(StreamReader::new(value.as_bytes()))
+impl<'a> From<&'a [u8]> for EventReader<'a, Parser<&'a [u8]>> {
+    fn from(src: &'a [u8]) -> Self {
+        EventReader::new(Parser::from(src))
     }
 }
