@@ -126,18 +126,18 @@ impl<T: BufRead> ReadSource for SrcReader<T> {
         let delim = delim.as_bytes();
         let has_delim = !delim.is_empty();
         let mut buf = self.buf()?;
-        let mut buf_pos = 0;
+        let mut byte_count = 0;
         let mut result = String::new();
 
         loop {
             if has_delim {
                 if buf.len() < delim.len() {
-                    self.advance(buf_pos);
+                    self.advance(byte_count);
                     buf = self.buf()?;
-                    buf_pos = 0;
+                    byte_count = 0;
                     continue;
                 } else if buf.starts_with(delim) {
-                    buf_pos += delim.len();
+                    byte_count += delim.len();
                     break;
                 }
             }
@@ -145,12 +145,12 @@ impl<T: BufRead> ReadSource for SrcReader<T> {
                 Some((ch, len)) if predicate(ch) => {
                     result.push(ch);
                     buf = &buf[len..];
-                    buf_pos += len;
+                    byte_count += len;
                 }
                 None => {
-                    self.advance(buf_pos);
+                    self.advance(byte_count);
                     buf = self.buf()?;
-                    buf_pos = 0;
+                    byte_count = 0;
                 }
                 _ => break,
             }
@@ -158,9 +158,8 @@ impl<T: BufRead> ReadSource for SrcReader<T> {
                 break;
             }
         }
-        if buf_pos > 0 {
-            self.advance(buf_pos);
-            self.state.pos += buf_pos;
+        if byte_count > 0 {
+            self.advance(byte_count);
         }
 
         Ok(Cow::Owned(result))
