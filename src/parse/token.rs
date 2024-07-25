@@ -5,6 +5,8 @@ use std::borrow::Cow;
 use crate::error::Result;
 use crate::parse::Parse;
 
+use super::ParseSource;
+
 pub trait Token: Parse {
     fn display() -> &'static str;
 }
@@ -25,24 +27,15 @@ pub trait Literal: Token {
     }
 }
 
-pub(super) trait ParseToken {
-    fn opt_parse_punct<'p>(&mut self, punct: &'p str) -> Result<Option<&'p str>>;
-
-    fn opt_parse_lit<'l>(
-        &mut self,
-        rule: impl FnMut(char) -> bool,
-        delim: Option<&str>,
-    ) -> Result<Option<Cow<'l, str>>>;
-}
-
-#[allow(private_bounds)]
-pub fn opt_parse_punct<'p>(input: &mut impl ParseToken, punct: &'p str) -> Result<Option<&'p str>> {
+pub fn opt_parse_punct<'p>(
+    input: &mut impl ParseSource,
+    punct: &'p str,
+) -> Result<Option<&'p str>> {
     input.opt_parse_punct(punct)
 }
 
-#[allow(private_bounds)]
 pub fn opt_parse_lit<'l>(
-    input: &mut impl ParseToken,
+    input: &mut impl ParseSource,
     rule: impl FnMut(char) -> bool,
     delim: Option<&str>,
 ) -> Result<Option<Cow<'l, str>>> {
@@ -68,11 +61,16 @@ macro_rules! define_punctuation {
         impl $crate::parse::Parse for $name {
             fn parse(input: &mut impl $crate::parse::ParseSource) -> $crate::error::Result<Self> {
                 use  $crate::token::Token;
-                use  $crate::token::Punctuation;
 
-                $crate::token::opt_parse_punct(input, $name::PUNCT).map(|r| r.map(|_| Self))?.ok_or_else(
+                Self::opt_parse(input)?.ok_or_else(
                     || $crate::error::SyntaxError::UnexpectedToken($name::display()).into()
                 )
+            }
+
+            fn opt_parse(input: &mut impl $crate::parse::ParseSource) -> $crate::error::Result<Option<Self>> {
+                use  $crate::token::Punctuation;
+
+                $crate::token::opt_parse_punct(input, $name::PUNCT).map(|r| r.map(|_| Self))
             }
         }
     )+};
@@ -121,16 +119,20 @@ macro_rules! define_literals {
             fn parse(input: &mut impl $crate::parse::ParseSource) -> $crate::error::Result<Self> {
                 use  $crate::token::Token;
 
+                Self::opt_parse(input)?.ok_or_else(
+                    || $crate::error::SyntaxError::UnexpectedToken($name::display()).into()
+                )
+            }
+
+            fn opt_parse(input: &mut impl $crate::parse::ParseSource) -> $crate::error::Result<Option<Self>> {
                 let delim = None $( .or($(if input.opt_parse_punct($delim::PUNCT)?.is_some() {
                         Some(<$delim as Delimiter>::End::PUNCT)
                     } )else+ else {
-                        return Err($crate::error::SyntaxError::UnexpectedToken($name::display()).into())
+                        return Ok(None)
                     })
                 )?;
 
-                $crate::token::opt_parse_lit(input, $rule, delim).map(|r| r.map(|lit| Self(lit)))?.ok_or_else(
-                    || $crate::error::SyntaxError::UnexpectedToken($name::display()).into()
-                )
+                $crate::token::opt_parse_lit(input, $rule, delim).map(|r| r.map(|lit| Self(lit)))
             }
         }
     )+};
