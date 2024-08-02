@@ -4,10 +4,10 @@ use std::borrow::Cow;
 
 use crate::error::{Error, Result, SyntaxError};
 
-use crate::read::{ReadSource, SrcReader};
+use crate::read::{ReadSource, SourceReader};
 use token::{Delimiter, Punctuation};
 
-pub type Parser<T> = SrcReader<T>;
+pub type Parser<T> = SourceReader<T>;
 
 pub trait Parse: Sized {
     fn parse(input: &mut impl ParseSource) -> Result<Self>;

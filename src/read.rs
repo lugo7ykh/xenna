@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::io::BufRead;
 use std::{char, str};
 
@@ -6,16 +7,10 @@ use crate::encoding::{self, Encoding};
 use crate::error::Result;
 
 pub(crate) trait ReadSource {
-    fn buf(&mut self) -> Result<&[u8]>;
-
-    fn advance(&mut self, n: usize);
-
     fn is_empty(&mut self) -> Result<bool>;
 
     fn pos(&self) -> (usize, usize);
-
     fn shift(&mut self, n: usize);
-
     fn unshift(&mut self, n: usize);
 
     fn encoding(&mut self) -> Result<Encoding>;
@@ -30,15 +25,15 @@ pub(crate) trait ReadSource {
 }
 
 pub struct ReaderState {
-    enc: Option<Encoding>,
     pos: usize,
     offset: usize,
+    enc: OnceCell<Encoding>,
 }
 
 impl ReaderState {
     pub fn new() -> Self {
         Self {
-            enc: None,
+            enc: OnceCell::new(),
             pos: 0,
             offset: 0,
         }
@@ -51,12 +46,12 @@ impl Default for ReaderState {
     }
 }
 
-pub struct SrcReader<T> {
+pub struct SourceReader<T> {
     reader: T,
     state: ReaderState,
 }
 
-impl<T> SrcReader<T> {
+impl<T> SourceReader<T> {
     pub fn new(reader: T) -> Self {
         Self {
             reader,
@@ -65,22 +60,22 @@ impl<T> SrcReader<T> {
     }
 }
 
-impl<T: BufRead> ReadSource for SrcReader<T> {
+impl<T: BufRead> SourceReader<T> {
     fn buf(&mut self) -> Result<&[u8]> {
         let offset = self.state.offset;
         Ok(&self.reader.fill_buf()?[offset..])
     }
 
     fn advance(&mut self, n: usize) {
-        if n > 0 {
-            let n = self.state.offset + n;
+        let n = self.state.offset + n;
 
-            self.reader.consume(n);
-            self.state.pos += n;
-            self.state.offset = 0;
-        }
+        self.reader.consume(n);
+        self.state.pos += n;
+        self.state.offset = 0;
     }
+}
 
+impl<T: BufRead> ReadSource for SourceReader<T> {
     fn is_empty(&mut self) -> Result<bool> {
         Ok(self.buf()?.is_empty())
     }
@@ -98,13 +93,16 @@ impl<T: BufRead> ReadSource for SrcReader<T> {
     }
 
     fn encoding(&mut self) -> Result<Encoding> {
-        if self.state.enc.is_none() && self.state.pos == 0 {
+        Ok(if let Some(enc) = self.state.enc.get() {
+            enc
+        } else if self.state.pos == 0 {
             let (enc, bom_len) = encoding::detect(self.buf()?);
             self.advance(bom_len);
-            self.state.enc = Some(enc);
+            self.state.enc.get_or_init(|| enc)
+        } else {
+            self.state.enc.get_or_init(Encoding::default)
         }
-
-        Ok(*self.state.enc.get_or_insert_with(Encoding::default))
+        .to_owned())
     }
 
     fn accept(&mut self, needle: &str) -> Result<Option<usize>> {
@@ -124,33 +122,32 @@ impl<T: BufRead> ReadSource for SrcReader<T> {
         }
         let enc = self.encoding()?;
         let delim = delim.as_bytes();
-        let has_delim = !delim.is_empty();
         let mut buf = self.buf()?;
-        let mut byte_count = 0;
+        let mut byte_read_count = 0;
         let mut result = String::new();
 
         loop {
-            if has_delim {
+            if !delim.is_empty() {
                 if buf.len() < delim.len() {
-                    self.advance(byte_count);
+                    self.advance(byte_read_count);
+                    byte_read_count = 0;
                     buf = self.buf()?;
-                    byte_count = 0;
                     continue;
                 } else if buf.starts_with(delim) {
-                    byte_count += delim.len();
+                    byte_read_count += delim.len();
                     break;
                 }
             }
-            match enc.decode_char(buf) {
-                Some((ch, len)) if predicate(ch) => {
+            match enc.next_char(buf) {
+                Some((ch, rest)) if predicate(ch) => {
+                    byte_read_count += buf.len() - rest.len();
+                    buf = rest;
                     result.push(ch);
-                    buf = &buf[len..];
-                    byte_count += len;
                 }
                 None => {
-                    self.advance(byte_count);
+                    self.advance(byte_read_count);
+                    byte_read_count = 0;
                     buf = self.buf()?;
-                    byte_count = 0;
                 }
                 _ => break,
             }
@@ -158,16 +155,16 @@ impl<T: BufRead> ReadSource for SrcReader<T> {
                 break;
             }
         }
-        if byte_count > 0 {
-            self.advance(byte_count);
+        if byte_read_count > 0 {
+            self.advance(byte_read_count);
         }
 
         Ok(Cow::Owned(result))
     }
 }
 
-impl<'a> From<&'a [u8]> for SrcReader<&'a [u8]> {
+impl<'a> From<&'a [u8]> for SourceReader<&'a [u8]> {
     fn from(value: &'a [u8]) -> Self {
-        SrcReader::new(value)
+        SourceReader::new(value)
     }
 }

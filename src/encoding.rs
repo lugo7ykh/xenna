@@ -17,13 +17,13 @@ pub enum Encoding {
 }
 
 impl Encoding {
-    pub fn decode_char(&self, bytes: &[u8]) -> Option<(char, usize)> {
+    pub fn next_char<'a>(&self, bytes: &'a [u8]) -> Option<(char, &'a [u8])> {
         let char_len = match self {
             Self::Utf8 => utf8_char_len(*bytes.first()?).unwrap(),
             Encoding::Utf16Be | Encoding::Utf16Le => 2,
             _ => 1,
         };
-        let char_bytes = bytes.get(..char_len)?;
+        let (char_bytes, rest) = bytes.split_at(char_len);
 
         match self {
             Self::Ascii | Self::Utf8 => unsafe { str::from_utf8_unchecked(char_bytes) },
@@ -31,7 +31,7 @@ impl Encoding {
         }
         .chars()
         .next()
-        .map(|char| (char, char_len))
+        .map(|char| (char, rest))
     }
 }
 
