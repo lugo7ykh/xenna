@@ -52,10 +52,7 @@ pub trait ParseSource: PrivParseSource + Sized {
 
 impl<T: ReadSource> PrivParseSource for T {
     fn opt_parse_punct<'p>(&mut self, punct: &'p str) -> Result<Option<&'p str>> {
-        Ok(self.accept(punct)?.map(|n| {
-            self.shift(n);
-            punct
-        }))
+        Ok(self.skip_next(punct)?.then_some(punct))
     }
 
     fn opt_parse_lit<'a>(
@@ -72,14 +69,15 @@ impl<T: ReadSource> PrivParseSource for T {
     }
 
     fn default_opt_parse<P: Parse>(&mut self) -> Result<Option<P>> {
-        let (pos_before, offset_before) = self.pos();
+        let pos_before = self.pos();
 
         let result = P::parse(self);
-        let (pos, offset) = self.pos();
+        let pos = self.pos();
 
         match result {
-            Err(Error::Syntax(SyntaxError::UnexpectedToken(_))) if pos == pos_before => {
-                self.unshift(offset - offset_before);
+            Err(Error::Syntax(SyntaxError::UnexpectedToken(_)))
+                if self.go_back(pos - pos_before) =>
+            {
                 Ok(None)
             }
             _ => result.map(Some),

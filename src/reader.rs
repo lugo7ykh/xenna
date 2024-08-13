@@ -271,6 +271,6 @@ impl<'a, T: ParseSource> EventReader<'a, T> {
 
 impl<'a> From<&'a [u8]> for EventReader<'a, Parser<&'a [u8]>> {
     fn from(src: &'a [u8]) -> Self {
-        EventReader::new(Parser::from(src))
+        EventReader::new(Parser::new(src, "UTF8"))
     }
 }
