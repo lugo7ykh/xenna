@@ -1,8 +1,4 @@
-use std::{
-    error,
-    fmt::{self, Display},
-    io,
-};
+use std::{error, fmt, io};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -14,7 +10,7 @@ pub enum SyntaxError {
     UnexpectedEof,
 }
 
-impl Display for SyntaxError {
+impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MismatchedToken(token) => write!(f, "expected {token}"),
@@ -32,7 +28,7 @@ pub enum Error {
 }
 impl error::Error for Error {}
 
-impl Display for Error {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Io(e) => e.fmt(f),

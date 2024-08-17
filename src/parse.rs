@@ -1,11 +1,9 @@
 pub mod token;
 
-use std::borrow::Cow;
-
+use self::token::{Delimiter, Punctuation};
 use crate::error::{Error, Result, SyntaxError};
-
 use crate::read::{ReadSource, SourceReader};
-use token::{Delimiter, Punctuation};
+use std::borrow::Cow;
 
 pub type Parser<T> = SourceReader<T>;
 

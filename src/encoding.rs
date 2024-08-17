@@ -1,10 +1,7 @@
-use std::{
-    io::{BufRead, Result},
-    ops::{Deref, DerefMut},
-    str,
-};
-
 use encoding_rs::{CoderResult, Decoder, Encoding, UTF_8};
+use std::io::{BufRead, Result};
+use std::ops::{Deref, DerefMut};
+use std::str;
 
 pub struct DecBuffer<const S: usize = 8192> {
     buf: [u8; S],

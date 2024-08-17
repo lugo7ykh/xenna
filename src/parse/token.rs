@@ -1,11 +1,9 @@
 mod rules;
 
-use std::borrow::Cow;
-
+use super::ParseSource;
 use crate::error::Result;
 use crate::parse::Parse;
-
-use super::ParseSource;
+use std::borrow::Cow;
 
 pub trait Token: Parse {
     fn display() -> &'static str;
