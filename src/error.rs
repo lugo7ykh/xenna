@@ -8,19 +8,19 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum SyntaxError {
-    UnexpectedToken(&'static str),
+    MismatchedToken(&'static str),
     UnclosedDelimiter(&'static str),
+    UnexpectedDelimiter(&'static str),
+    UnexpectedEof,
 }
 
 impl Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnexpectedToken(expected) => {
-                write!(f, "expected `{expected}`")
-            }
-            Self::UnclosedDelimiter(delim) => {
-                write!(f, "delimiter `{delim}` not found before EOF")
-            }
+            Self::MismatchedToken(token) => write!(f, "expected {token}"),
+            Self::UnclosedDelimiter(delim) => write!(f, "expected {delim} before EOF"),
+            Self::UnexpectedDelimiter(delim) => write!(f, "unexpected {delim}"),
+            Self::UnexpectedEof => write!(f, "unexpected EOF"),
         }
     }
 }

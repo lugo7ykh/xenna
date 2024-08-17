@@ -63,7 +63,7 @@ macro_rules! define_punctuation {
                 use  $crate::token::Token;
 
                 Self::opt_parse(input)?.ok_or_else(
-                    || $crate::error::SyntaxError::UnexpectedToken($name::display()).into()
+                    || $crate::error::SyntaxError::MismatchedToken($name::display()).into()
                 )
             }
 
@@ -120,7 +120,7 @@ macro_rules! define_literals {
                 use  $crate::token::Token;
 
                 Self::opt_parse(input)?.ok_or_else(
-                    || $crate::error::SyntaxError::UnexpectedToken($name::display()).into()
+                    || $crate::error::SyntaxError::MismatchedToken($name::display()).into()
                 )
             }
 

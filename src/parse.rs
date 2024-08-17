@@ -70,12 +70,11 @@ impl<T: ReadSource> PrivParseSource for T {
 
     fn default_opt_parse<P: Parse>(&mut self) -> Result<Option<P>> {
         let pos_before = self.pos();
-
         let result = P::parse(self);
         let pos = self.pos();
 
         match result {
-            Err(Error::Syntax(SyntaxError::UnexpectedToken(_)))
+            Err(Error::Syntax(SyntaxError::MismatchedToken(_)))
                 if self.go_back(pos - pos_before) =>
             {
                 Ok(None)
@@ -91,17 +90,17 @@ impl<T: ReadSource> ParseSource for T {
     }
 }
 
-pub struct Delimited<'a, T> {
+struct Delimited<'a, T> {
     inner: &'a mut T,
-    delim: Cow<'static, str>,
+    delim: &'static str,
     is_ended: bool,
 }
 
-impl<'a, T> Delimited<'a, T> {
+impl<'a, T: PrivParseSource> Delimited<'a, T> {
     fn new(inner: &'a mut T, delim: &'static str) -> Self {
         Self {
             inner,
-            delim: delim.into(),
+            delim,
             is_ended: false,
         }
     }
@@ -128,7 +127,7 @@ impl<'a, T: PrivParseSource> PrivParseSource for Delimited<'a, T> {
 impl<'a, T: ParseSource> ParseSource for Delimited<'a, T> {
     fn is_empty(&mut self) -> Result<bool> {
         self.is_ended |= self.inner.is_empty()?;
-        self.is_ended |= self.inner.opt_parse_punct(&self.delim)?.is_some();
+        self.is_ended |= self.inner.opt_parse_punct(self.delim)?.is_some();
 
         Ok(self.is_ended)
     }
