@@ -10,7 +10,7 @@ memchr = "2"
 [dev-dependencies]
 divan = "0.1"
 quick-xml = "0.36"
-xml-rs = "0.8"
+xml = "0.8"
 
 [[bench]]
 name = "macrobenches"
